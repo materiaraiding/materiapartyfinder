@@ -16,3 +16,7 @@ crons = ["*/5 * * * *"] # Run once every 5 minutes
 binding = "DB"
 database_name = "discord_threads_db"
 database_id = "b2154043-8311-44e6-923a-20a7e610a76b"
+
+[observability]
+enabled = true
+head_sampling_rate = 0.1 # 10% of requests are logged
