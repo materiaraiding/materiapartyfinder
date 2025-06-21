@@ -1,0 +1,24 @@
+name = "discord-thread-tracker"
+main = "src/index.js"
+compatibility_flags = [ "nodejs_compat" ]
+compatibility_date = "2024-09-23"
+
+# Configure the schedule for the worker (runs every hour)
+[triggers]
+crons = ["*/1 * * * *"] # Run once every 5 minutes
+
+# Configure environment variables
+[vars]
+# Do not put actual secrets here - they should be defined using wrangler secret commands
+DISCORD_TOKEN="YOUR_DISCORD_BOT_TOKEN"
+DISCORD_GUILD_ID="YOUR_DISCORD_GUILD_ID"
+
+# Configure D1 database bindings
+[[d1_databases]]
+binding = "DB"
+database_name = "discord_threads_db"
+database_id = "YOUR_DATABASE_ID"
+
+[observability]
+enabled = true
+head_sampling_rate = 0.1 # 10% of requests are logged
