@@ -1,6 +1,6 @@
 # Discord Thread Tracker
 
-A Cloudflare Worker that fetches Discord forum threads and stores them in a Cloudflare D1 database for easy querying and archiving.
+A Cloudflare Worker that fetches Discord forum threads and stores them in a Cloudflare D1 database for use in other web applications. This worker is designed to run on a schedule, automatically updating the database with the latest thread information.
 
 ## Features
 
