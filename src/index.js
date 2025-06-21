@@ -6,27 +6,25 @@
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
-export default {
-  // Schedule the worker to run according to cron expression (every hour in this example)
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil(handleScheduled(env));
-  },
+// Export scheduled function as a named export for Cloudflare Workers
+export async function scheduled(event, env, ctx) {
+  ctx.waitUntil(handleScheduled(env));
+}
 
-  // Optional: Add fetch handler for on-demand execution and testing
-  async fetch(request, env, ctx) {
-    try {
-      const result = await handleScheduled(env);
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } catch (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+// Export fetch handler as a named export
+export async function fetch(request, env, ctx) {
+  try {
+    const result = await handleScheduled(env);
+    return new Response(JSON.stringify(result), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
-};
+}
 
 async function handleScheduled(env) {
   const results = {
