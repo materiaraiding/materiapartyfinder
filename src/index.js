@@ -8,7 +8,7 @@ import { Routes } from 'discord-api-types/v10';
 
 // Helper function to handle the scheduled task
 async function handleScheduled(env) {
-  console.log('Starting scheduled task: Discord thread tracking');
+  console.log({ message: 'Starting scheduled task: Discord thread tracking' });
   const startTime = Date.now();
 
   const results = {
@@ -20,32 +20,43 @@ async function handleScheduled(env) {
   try {
     // Initialize Discord REST client
     const rest = new REST({ version: '10' }).setToken(env.DISCORD_TOKEN);
-    console.log('Discord REST client initialized');
+    console.log({ message: 'Discord REST client initialized' });
 
     // Get guild ID from environment variable
     const guildId = env.DISCORD_GUILD_ID;
-    console.log(`Processing threads for guild ID: ${guildId}`);
+    console.log({ message: 'Processing threads for guild', guildId });
 
     // Get all active threads in the guild
-    console.log('Fetching all active threads in the guild');
+    console.log({ message: 'Fetching all active threads in the guild' });
     const activeThreads = await rest.get(
       Routes.guildActiveThreads(guildId)
     );
 
-    console.log(`Found ${activeThreads.threads?.length || 0} active threads in guild ${guildId}`);
+    console.log({
+      message: 'Found active threads in guild',
+      count: activeThreads.threads?.length || 0,
+      guildId
+    });
 
     // Process each active thread
     if (activeThreads.threads && activeThreads.threads.length > 0) {
       for (const thread of activeThreads.threads) {
-        console.log(`Processing thread: ${thread.id} - "${thread.name}"`);
+        console.log({
+          message: 'Processing thread',
+          threadId: thread.id,
+          threadName: thread.name
+        });
         await processThread(env, thread);
         results.threadsProcessed++;
       }
     } else {
-      console.log('No active threads found in the guild');
+      console.log({ message: 'No active threads found in the guild' });
     }
   } catch (error) {
-    console.error(`Fatal error in handleScheduled: ${error.message}`);
+    console.error({
+      message: 'Fatal error in handleScheduled',
+      error: error.message
+    });
     results.success = false;
     results.errors.push({
       message: error.message
@@ -53,9 +64,18 @@ async function handleScheduled(env) {
   }
 
   const executionTime = Date.now() - startTime;
-  console.log(`Completed task with ${results.success ? 'success' : 'failure'}, processed ${results.threadsProcessed} threads in ${executionTime}ms`);
+  console.log({
+    message: 'Completed task',
+    status: results.success ? 'success' : 'failure',
+    threadsProcessed: results.threadsProcessed,
+    executionTimeMs: executionTime
+  });
   if (results.errors.length > 0) {
-    console.error(`Encountered ${results.errors.length} errors:`, results.errors);
+    console.error({
+      message: 'Encountered errors',
+      errorCount: results.errors.length,
+      errors: results.errors
+    });
   }
 
   return results;
@@ -81,8 +101,9 @@ async function processThread(env, thread) {
 
   try {
     // Log detailed thread information for debugging
-    console.log('Processing thread with details:');
+    console.log({ message: 'Processing thread with details' });
     console.log({
+      message: 'Thread data',
       thread_id: id,
       thread_name: name,
       topic: topic || 'N/A',
@@ -95,7 +116,12 @@ async function processThread(env, thread) {
       thread_metadata: thread_metadata || {}
     });
 
-    console.log(`Storing thread ${id} in database with ${message_count} messages, ${member_count} members`);
+    console.log({
+      message: 'Storing thread in database',
+      threadId: id,
+      messageCount: message_count,
+      memberCount: member_count
+    });
 
     // Store thread in D1 database
     await env.DB.prepare(`
@@ -127,9 +153,13 @@ async function processThread(env, thread) {
         )
         .run();
 
-    console.log(`Successfully stored thread ${id} in database`);
+    console.log({ message: 'Successfully stored thread in database', threadId: id });
   } catch (error) {
-    console.error(`Error storing thread ${id} in database: ${error.message}`);
+    console.error({
+      message: 'Error storing thread in database',
+      threadId: id,
+      error: error.message
+    });
     throw error; // Re-throw to be handled by the caller
   }
 }
@@ -138,21 +168,31 @@ async function processThread(env, thread) {
 export default {
   // Schedule the worker to run according to cron expression defined in wrangler.toml
   async scheduled(event, env, ctx) {
-    console.log(`Running scheduled execution triggered by ${event.cron}`);
+    console.log({ message: 'Running scheduled execution', trigger: event.cron });
     ctx.waitUntil(handleScheduled(env));
   },
 
   // Handler for HTTP requests - useful for testing and on-demand execution
   async fetch(request, env, ctx) {
-    console.log(`Received HTTP request: ${request.method} ${request.url}`);
+    console.log({
+      message: 'Received HTTP request',
+      method: request.method,
+      url: request.url
+    });
     try {
       const result = await handleScheduled(env);
-      console.log(`HTTP request completed successfully with ${result.threadsProcessed} threads processed`);
+      console.log({
+        message: 'HTTP request completed successfully',
+        threadsProcessed: result.threadsProcessed
+      });
       return new Response(JSON.stringify(result), {
         headers: { 'Content-Type': 'application/json' }
       });
     } catch (error) {
-      console.error(`HTTP request failed with error: ${error.message}`);
+      console.error({
+        message: 'HTTP request failed',
+        error: error.message
+      });
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
