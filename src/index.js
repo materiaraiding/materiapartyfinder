@@ -6,25 +6,14 @@
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
-// Environment interface for type safety
-interface Env {
-  // Discord configuration
-  DISCORD_TOKEN: string;
-  DISCORD_GUILD_ID: string;
-  DISCORD_FORUM_CHANNEL_IDS: string; // Comma-separated list of channel IDs
-
-  // D1 database binding
-  DB: D1Database;
-}
-
 export default {
   // Schedule the worker to run according to cron expression (every hour in this example)
-  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(event, env, ctx) {
     ctx.waitUntil(handleScheduled(env));
   },
 
   // Optional: Add fetch handler for on-demand execution and testing
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request, env, ctx) {
     try {
       const result = await handleScheduled(env);
       return new Response(JSON.stringify(result), {
@@ -39,7 +28,7 @@ export default {
   }
 };
 
-async function handleScheduled(env: Env): Promise<any> {
+async function handleScheduled(env) {
   const results = {
     success: true,
     threadsProcessed: 0,
@@ -58,8 +47,8 @@ async function handleScheduled(env: Env): Promise<any> {
       try {
         // Fetch active threads in the forum channel
         const activeThreads = await rest.get(
-          Routes.channelThreads(channelId)
-        ) as any[];
+            Routes.channelThreads(channelId)
+        );
 
         // Process each thread
         for (const thread of activeThreads) {
@@ -86,32 +75,32 @@ async function handleScheduled(env: Env): Promise<any> {
 /**
  * Process a single Discord thread and store it in the D1 database
  */
-async function processThread(env: Env, thread: any): Promise<void> {
+async function processThread(env, thread) {
   // Extract relevant thread information
   const { id, name, owner_id, created_timestamp, member_count, message_count, applied_tags } = thread;
 
   // Store thread in D1 database
   await env.DB.prepare(`
     INSERT INTO discord_threads (
-      thread_id, thread_name, owner_id, created_timestamp, 
+      thread_id, thread_name, owner_id, created_timestamp,
       member_count, message_count, applied_tags, last_updated
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (thread_id) DO UPDATE SET
+      ON CONFLICT (thread_id) DO UPDATE SET
       thread_name = excluded.thread_name,
-      member_count = excluded.member_count,
-      message_count = excluded.message_count,
-      applied_tags = excluded.applied_tags,
-      last_updated = excluded.last_updated
+                                   member_count = excluded.member_count,
+                                   message_count = excluded.message_count,
+                                   applied_tags = excluded.applied_tags,
+                                   last_updated = excluded.last_updated
   `)
-  .bind(
-    id,
-    name,
-    owner_id,
-    created_timestamp,
-    member_count,
-    message_count,
-    JSON.stringify(applied_tags),
-    Date.now()
-  )
-  .run();
+      .bind(
+          id,
+          name,
+          owner_id,
+          created_timestamp,
+          member_count,
+          message_count,
+          JSON.stringify(applied_tags),
+          Date.now()
+      )
+      .run();
 }
