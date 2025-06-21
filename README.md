@@ -98,32 +98,23 @@ npm run deploy
 
 After deployment, the worker will run on the schedule defined in your `wrangler.toml` file (default: every 5 minutes).
 
-## Accessing the Data
-
-You can query your D1 database directly using Wrangler:
-
-```bash
-npx wrangler d1 execute discord_threads_db --command="SELECT * FROM discord_threads LIMIT 10"
-```
-
-Or build a custom dashboard using Cloudflare Pages or another frontend service.
-
 ## Schema Details
 
 The database stores the following information about each thread:
 
-| Field           | Description                                       |
-|-----------------|---------------------------------------------------|
-| thread_id       | Discord's unique identifier for the thread        |
-| thread_name     | The name/title of the thread                      |
-| topic           | The thread's topic description                    |
-| owner_id        | Discord user ID of the thread creator             |
-| parent_id       | ID of the parent channel/forum                    |
-| member_count    | Number of members in the thread                   |
-| message_count   | Number of messages in the thread                  |
-| available_tags  | JSON string of available tags for the thread      |
-| applied_tags    | JSON string of tags applied to the thread         |
-| thread_metadata | JSON string containing thread metadata            |
+| Field            | Description                                       |
+|------------------|---------------------------------------------------|
+| thread_id        | Discord's unique identifier for the thread        |
+| thread_name      | The name/title of the thread                      |
+| topic            | The thread's topic description                    |
+| owner_id         | Discord user ID of the thread creator             |
+| owner_nickname   | Nickname of the thread creator                    |
+| parent_id        | ID of the parent channel/forum                    |
+| member_count     | Number of members in the thread                   |
+| message_count    | Number of messages in the thread                  |
+| available_tags   | JSON string of available tags for the thread      |
+| applied_tags     | JSON string of tags applied to the thread         |
+| thread_metadata  | JSON string containing thread metadata            |
 
 ## Troubleshooting
 
