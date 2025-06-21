@@ -1,0 +1,29 @@
+{
+  "name": "materiapartyfinder",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker that fetches Discord forum threads and stores them in D1",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "discord",
+    "d1"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/rest": "^1.7.1",
+    "discord-api-types": "^0.37.46"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230518.0",
+    "typescript": "^5.1.6",
+    "wrangler": "^3.1.0"
+  }
+}
+

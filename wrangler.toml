@@ -1,0 +1,20 @@
+name = "discord-thread-tracker"
+main = "src/index.ts"
+compatibility_date = "2023-05-18"
+
+# Configure the schedule for the worker (runs every hour)
+[triggers]
+crons = ["0 * * * *"] # Run once every hour
+
+# Configure environment variables
+[vars]
+# Do not put actual secrets here - they will be defined using wrangler secret commands
+# These are placeholder examples
+DISCORD_GUILD_ID = "your_guild_id"
+DISCORD_FORUM_CHANNEL_IDS = "channel_id_1,channel_id_2"
+
+# Configure D1 database bindings
+[[d1_databases]]
+binding = "DB"
+database_name = "discord_threads_db"
+database_id = "your_database_id_will_be_here"
