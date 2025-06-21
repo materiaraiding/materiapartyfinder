@@ -26,6 +26,16 @@ async function handleScheduled(env) {
     const guildId = env.DISCORD_GUILD_ID;
     console.log({ message: 'Processing threads for guild', guildId });
 
+    // First, clear all existing records from the discord_threads table
+    console.log({ message: 'Clearing existing thread records from database' });
+    try {
+      await env.DB.prepare('DELETE FROM discord_threads').run();
+      console.log({ message: 'Successfully cleared thread records from database' });
+    } catch (error) {
+      console.error({ message: 'Error clearing thread records', error: error.message });
+      // Continue processing even if clearing fails
+    }
+
     // Get all active threads in the guild
     console.log({ message: 'Fetching all active threads in the guild' });
     const activeThreads = await rest.get(
