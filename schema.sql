@@ -8,6 +8,7 @@ CREATE TABLE discord_threads (
   thread_name TEXT NOT NULL,
   topic TEXT,
   owner_id TEXT,
+  owner_nickname TEXT,
   parent_id TEXT,
   member_count INTEGER,
   message_count INTEGER,

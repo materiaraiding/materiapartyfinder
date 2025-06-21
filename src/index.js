@@ -100,14 +100,53 @@ async function processThread(env, thread) {
   } = thread;
 
   try {
-    // Log detailed thread information for debugging
     console.log({ message: 'Processing thread with details' });
+
+    // Initialize variable for owner nickname
+    let owner_nickname = null;
+
+    // Fetch thread owner details if owner_id is available
+    if (owner_id) {
+      try {
+        console.log({
+          message: 'Fetching thread owner nickname',
+          ownerId: owner_id,
+          guildId: env.DISCORD_GUILD_ID
+        });
+
+        // Initialize Discord REST client (reuse the one from handleScheduled if possible)
+        const rest = new REST({ version: '10' }).setToken(env.DISCORD_TOKEN);
+
+        // Fetch member details from Discord API
+        const guildMember = await rest.get(
+          Routes.guildMember(env.DISCORD_GUILD_ID, owner_id)
+        );
+
+        // Extract nickname (fall back to username if nickname is not set)
+        owner_nickname = guildMember.nick || guildMember.user?.username || null;
+
+        console.log({
+          message: 'Successfully fetched thread owner nickname',
+          nickname: owner_nickname
+        });
+      } catch (error) {
+        console.error({
+          message: 'Error fetching thread owner nickname',
+          ownerId: owner_id,
+          error: error.message
+        });
+        // Continue with the process even if we can't get the owner details
+      }
+    }
+
+    // Log detailed thread information after nickname is fetched
     console.log({
       message: 'Thread data',
       thread_id: id,
       thread_name: name,
       topic: topic || 'N/A',
       owner_id: owner_id,
+      owner_nickname: owner_nickname || 'N/A',
       parent_id: parent_id || 'N/A',
       member_count: member_count,
       message_count: message_count,
@@ -120,18 +159,21 @@ async function processThread(env, thread) {
       message: 'Storing thread in database',
       threadId: id,
       messageCount: message_count,
-      memberCount: member_count
+      memberCount: member_count,
+      ownerNickname: owner_nickname
     });
 
     // Store thread in D1 database
     await env.DB.prepare(`
       INSERT INTO discord_threads (
-        thread_id, thread_name, topic, owner_id, parent_id,
-        member_count, message_count, available_tags, applied_tags, thread_metadata
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        thread_id, thread_name, topic, owner_id, owner_nickname,
+        parent_id, member_count, message_count, available_tags, applied_tags, thread_metadata
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (thread_id) DO UPDATE SET
         thread_name = excluded.thread_name,
         topic = excluded.topic,
+        owner_id = excluded.owner_id,
+        owner_nickname = excluded.owner_nickname,
         parent_id = excluded.parent_id,
         member_count = excluded.member_count,
         message_count = excluded.message_count,
@@ -144,6 +186,7 @@ async function processThread(env, thread) {
             name,
             topic || null,
             owner_id,
+            owner_nickname,
             parent_id || null,
             member_count,
             message_count,
