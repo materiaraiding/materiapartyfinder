@@ -147,8 +147,12 @@ async function handleScheduled(env) {
     try {
       await env.DB.prepare('DELETE FROM discord_threads').run();
       console.log({ message: 'Successfully cleared thread records from database' });
+
+      // Also clear the channel tags table
+      await env.DB.prepare('DELETE FROM discord_channel_tags').run();
+      console.log({ message: 'Successfully cleared channel tags from database' });
     } catch (error) {
-      console.error({ message: 'Error clearing thread records', error: error.message });
+      console.error({ message: 'Error clearing records', error: error.message });
       // Continue processing even if clearing fails
     }
 
@@ -172,6 +176,9 @@ async function handleScheduled(env) {
       guildId
     });
 
+    // Track unique parent_ids
+    const uniqueParentIds = new Set();
+
     // Process each active thread
     if (activeThreads.threads && activeThreads.threads.length > 0) {
       for (const thread of activeThreads.threads) {
@@ -181,10 +188,26 @@ async function handleScheduled(env) {
           threadName: thread.name
         });
         await processThread(env, thread, memberMap);
+
+        // Store parent_id if it exists
+        if (thread.parent_id) {
+          uniqueParentIds.add(thread.parent_id);
+        }
+
         results.threadsProcessed++;
       }
     } else {
       console.log({ message: 'No active threads found in the guild' });
+    }
+
+    // After processing all threads, fetch channel info for each unique parent_id
+    console.log({
+      message: 'Fetching channel info for unique parent channels',
+      uniqueChannelCount: uniqueParentIds.size
+    });
+
+    if (uniqueParentIds.size > 0) {
+      await processChannelTags(env, rest, guildId, uniqueParentIds);
     }
   } catch (error) {
     console.error({
@@ -318,6 +341,83 @@ async function processThread(env, thread, memberMap) {
     });
     throw error; // Re-throw to be handled by the caller
   }
+}
+
+/**
+ * Fetch channel information and store tags for each unique parent channel
+ * @param {Object} env - Environment variables
+ * @param {Object} rest - Discord REST client
+ * @param {string} guildId - Discord guild ID
+ * @param {Set} uniqueParentIds - Set of unique parent channel IDs
+ */
+async function processChannelTags(env, rest, guildId, uniqueParentIds) {
+  console.log({ message: 'Starting to fetch and store channel tags' });
+
+  for (const channelId of uniqueParentIds) {
+    try {
+      console.log({ message: `Fetching channel info for channel ${channelId}` });
+
+      // Fetch channel info from Discord API
+      const channelInfo = await rest.get(
+        Routes.channel(channelId)
+      );
+
+      // Check if channel has available_tags
+      if (channelInfo && channelInfo.available_tags && channelInfo.available_tags.length > 0) {
+        console.log({
+          message: 'Found tags for channel',
+          channelId,
+          tagCount: channelInfo.available_tags.length
+        });
+
+        // Process each tag
+        for (const tag of channelInfo.available_tags) {
+          const { id: tagId, name, emoji } = tag;
+
+          // Extract emoji information if available
+          const emojiInfo = emoji ? (emoji.name || null) : null;
+
+          console.log({
+            message: 'Storing tag in database',
+            channelId,
+            tagId,
+            tagName: name,
+            tagEmoji: emojiInfo
+          });
+
+          // Store tag in database
+          await env.DB.prepare(`
+            INSERT INTO discord_channel_tags (parent_id, tag_id, tag_name, tag_emoji)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (parent_id, tag_id) DO UPDATE SET
+            tag_name = excluded.tag_name,
+            tag_emoji = excluded.tag_emoji
+          `)
+            .bind(
+              channelId,
+              tagId,
+              name,
+              emojiInfo
+            )
+            .run();
+        }
+      } else {
+        console.log({
+          message: 'No tags found for channel or channel not accessible',
+          channelId
+        });
+      }
+    } catch (error) {
+      console.error({
+        message: 'Error fetching or storing channel tags',
+        channelId,
+        error: error.message
+      });
+      // Continue with next channel even if this one fails
+    }
+  }
+
+  console.log({ message: 'Completed fetching and storing channel tags' });
 }
 
 // Export a default object with scheduled and fetch handlers
