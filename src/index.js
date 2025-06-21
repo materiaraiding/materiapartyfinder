@@ -6,6 +6,122 @@
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
+/**
+ * Fetch all members of a guild in batches of 1000
+ * @param {Object} rest - Discord REST client
+ * @param {string} guildId - Discord guild ID
+ * @returns {Object} - Map of user IDs to nicknames/usernames
+ */
+async function fetchAllGuildMembers(rest, guildId) {
+  console.log({ message: 'Starting to fetch all guild members' });
+  const memberMap = {};
+
+  try {
+    let lastId = '0';
+    let hasMore = true;
+    let fetchedCount = 0;
+
+    while (hasMore) {
+      console.log({ message: `Fetching batch of guild members after ID ${lastId}` });
+      try {
+        // Create query parameters using URLSearchParams
+        const params = new URLSearchParams({
+          limit: '1000',
+          after: lastId
+        });
+
+        // Fetch 1000 members at a time (Discord API limit)
+        const response = await rest.get(
+          `${Routes.guildMembers(guildId)}?${params.toString()}`
+        );
+
+        // The response should be an array of member objects
+        const members = Array.isArray(response) ? response : [];
+
+        console.log({
+          message: 'Response from Discord API',
+          isArray: Array.isArray(response),
+          responseType: typeof response,
+          memberCount: members.length,
+          firstMember: members.length > 0 ? JSON.stringify(members[0]).substring(0, 100) + '...' : 'none'
+        });
+
+        if (!members.length) {
+          console.log({ message: 'No more members to fetch' });
+          hasMore = false;
+          break;
+        }
+
+        // Update the lastId for pagination
+        lastId = members[members.length - 1].user.id;
+        fetchedCount += members.length;
+
+        // Store member information in the map
+        for (const member of members) {
+          if (member.user) {
+            memberMap[member.user.id] = member.nick || member.user.username;
+          }
+        }
+
+        console.log({
+          message: 'Fetched batch of guild members',
+          count: members.length,
+          totalFetched: fetchedCount,
+          firstMemberId: members.length > 0 ? members[0].user?.id : 'none',
+          lastMemberId: members.length > 0 ? members[members.length - 1].user?.id : 'none'
+        });
+
+        // If we got fewer than 1000 members, we've reached the end
+        if (members.length < 1000) {
+          hasMore = false;
+        }
+      } catch (error) {
+        // If we get a "Missing Access" error, it means we don't have the GUILD_MEMBERS intent
+        if (error.message.includes('Missing Access')) {
+          console.warn({
+            message: 'Missing GUILD_MEMBERS privileged intent. Cannot fetch all members at once.',
+            error: error.message
+          });
+          // Break the loop as we don't have permission
+          hasMore = false;
+          break;
+        } else {
+          console.error({
+            message: 'Error fetching guild members',
+            error: error.message,
+            stack: error.stack
+          });
+          // Break the loop on other errors
+          hasMore = false;
+          break;
+        }
+      }
+    }
+
+    // If no members were fetched, try fetching individual members for thread owners
+    if (Object.keys(memberMap).length === 0) {
+      console.log({
+        message: 'No members could be fetched in bulk. Will fetch individual thread owners later.'
+      });
+    }
+  } catch (error) {
+    console.error({
+      message: 'Fatal error in fetchAllGuildMembers',
+      error: error.message,
+      stack: error.stack
+    });
+  }
+
+  console.log({
+    message: 'Completed fetching all guild members',
+    totalMembers: Object.keys(memberMap).length,
+    hasMembers: Object.keys(memberMap).length > 0,
+    sampleMembers: Object.keys(memberMap).slice(0, 5).map(id => ({ id, name: memberMap[id] }))
+  });
+
+  return memberMap;
+}
+
 // Helper function to handle the scheduled task
 async function handleScheduled(env) {
   console.log({ message: 'Starting scheduled task: Discord thread tracking' });
@@ -36,6 +152,14 @@ async function handleScheduled(env) {
       // Continue processing even if clearing fails
     }
 
+    // Fetch all guild members to create a mapping of user IDs to nicknames
+    console.log({ message: 'Fetching all guild members to create user mapping' });
+    const memberMap = await fetchAllGuildMembers(rest, guildId);
+    console.log({
+      message: 'Created member mapping',
+      memberCount: Object.keys(memberMap).length
+    });
+
     // Get all active threads in the guild
     console.log({ message: 'Fetching all active threads in the guild' });
     const activeThreads = await rest.get(
@@ -56,7 +180,7 @@ async function handleScheduled(env) {
           threadId: thread.id,
           threadName: thread.name
         });
-        await processThread(env, thread);
+        await processThread(env, thread, memberMap);
         results.threadsProcessed++;
       }
     } else {
@@ -94,7 +218,7 @@ async function handleScheduled(env) {
 /**
  * Process a single Discord thread and store it in the D1 database
  */
-async function processThread(env, thread) {
+async function processThread(env, thread, memberMap) {
   // Extract relevant thread information
   const {
     id,
@@ -110,43 +234,22 @@ async function processThread(env, thread) {
   } = thread;
 
   try {
-    console.log({ message: 'Processing thread with details' });
-
     // Initialize variable for owner nickname
     let owner_nickname = null;
 
-    // Fetch thread owner details if owner_id is available
-    if (owner_id) {
-      try {
-        console.log({
-          message: 'Fetching thread owner nickname',
-          ownerId: owner_id,
-          guildId: env.DISCORD_GUILD_ID
-        });
-
-        // Initialize Discord REST client (reuse the one from handleScheduled if possible)
-        const rest = new REST({ version: '10' }).setToken(env.DISCORD_TOKEN);
-
-        // Fetch member details from Discord API
-        const guildMember = await rest.get(
-          Routes.guildMember(env.DISCORD_GUILD_ID, owner_id)
-        );
-
-        // Extract nickname (fall back to username if nickname is not set)
-        owner_nickname = guildMember.nick || guildMember.user?.username || null;
-
-        console.log({
-          message: 'Successfully fetched thread owner nickname',
-          nickname: owner_nickname
-        });
-      } catch (error) {
-        console.error({
-          message: 'Error fetching thread owner nickname',
-          ownerId: owner_id,
-          error: error.message
-        });
-        // Continue with the process even if we can't get the owner details
-      }
+    // Fetch thread owner details from the member map
+    if (owner_id && memberMap[owner_id]) {
+      owner_nickname = memberMap[owner_id];
+      console.log({
+        message: 'Found owner nickname in member map',
+        ownerId: owner_id,
+        nickname: owner_nickname
+      });
+    } else {
+      console.log({
+        message: 'Owner nickname not found in member map, will be null',
+        ownerId: owner_id
+      });
     }
 
     // Log detailed thread information after nickname is fetched
