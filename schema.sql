@@ -20,10 +20,9 @@ CREATE TABLE discord_threads (
 
 -- Create table for Discord channel tags
 CREATE TABLE discord_channel_tags (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
   parent_id TEXT NOT NULL,
   tag_id TEXT NOT NULL,
   tag_name TEXT NOT NULL,
   tag_emoji TEXT,
-  UNIQUE(parent_id, tag_id)
+  PRIMARY KEY (parent_id, tag_id)
 );
