@@ -1,10 +1,11 @@
 name = "discord-thread-tracker"
 main = "src/index.js"
-compatibility_date = "2023-05-18"
+compatibility_flags = [ "nodejs_compat" ]
+compatibility_date = "2024-09-23"
 
 # Configure the schedule for the worker (runs every hour)
 [triggers]
-crons = ["0 * * * *"] # Run once every hour
+crons = ["*/5 * * * *"] # Run once every 5 minutes
 
 # Configure environment variables
 [vars]
