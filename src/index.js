@@ -6,26 +6,7 @@
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v10';
 
-// Export scheduled function as a named export for Cloudflare Workers
-export async function scheduled(event, env, ctx) {
-  ctx.waitUntil(handleScheduled(env));
-}
-
-// Export fetch handler as a named export
-export async function fetch(request, env, ctx) {
-  try {
-    const result = await handleScheduled(env);
-    return new Response(JSON.stringify(result), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
+// Helper function to handle the scheduled task
 async function handleScheduled(env) {
   const results = {
     success: true,
@@ -45,7 +26,7 @@ async function handleScheduled(env) {
       try {
         // Fetch active threads in the forum channel
         const activeThreads = await rest.get(
-            Routes.channelThreads(channelId)
+          Routes.channelThreads(channelId)
         );
 
         // Process each thread
@@ -102,3 +83,26 @@ async function processThread(env, thread) {
       )
       .run();
 }
+
+// Export a default object with scheduled and fetch handlers
+export default {
+  // Schedule the worker to run according to cron expression defined in wrangler.toml
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(handleScheduled(env));
+  },
+
+  // Handler for HTTP requests - useful for testing and on-demand execution
+  async fetch(request, env, ctx) {
+    try {
+      const result = await handleScheduled(env);
+      return new Response(JSON.stringify(result), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+};
