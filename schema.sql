@@ -6,10 +6,12 @@ DROP TABLE IF EXISTS discord_threads;
 CREATE TABLE discord_threads (
   thread_id TEXT PRIMARY KEY,
   thread_name TEXT NOT NULL,
+  topic TEXT,
   owner_id TEXT,
-  created_timestamp INTEGER,
+  parent_id TEXT,
   member_count INTEGER,
   message_count INTEGER,
-  applied_tags TEXT, -- JSON string of tag IDs
-  last_updated INTEGER NOT NULL
+  available_tags TEXT, -- JSON string of available tag objects
+  applied_tags TEXT, -- JSON string of applied tag IDs
+  thread_metadata TEXT -- JSON string of thread metadata
 );
